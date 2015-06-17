@@ -164,8 +164,7 @@ class VRouterVIFDriver(LibvirtBaseVIFDriver):
             from pprint import pformat
             LOG.error(_("Error in plug: %s locals: %s instance %s"
                        %(str(e), pformat(locals()),
-                         pformat(instance.__dict__))))
-    #end plug
+                         pformat(instance) if isinstance(instance, dict) else pformat(instance.__dict__))))
 
     def unplug(self, instance, vif):
         """Unplug the VIF from the network by deleting the port from
@@ -194,7 +193,7 @@ class VRouterVIFDriver(LibvirtBaseVIFDriver):
             from pprint import pformat
             LOG.error(_("Error in unplug: %s locals: %s instance %s"
                        %(str(e), pformat(locals()),
-                         pformat(instance.__dict__))))
+                         pformat(instance) if isinstance(instance, dict) else pformat(instance.__dict__))))
 
     #end unplug
 #end class VRouterVIFDriver
