@@ -30,10 +30,17 @@ try:
     from nova.openstack.common.gettextutils import _LE
 except:
     _LE = _
-from nova.openstack.common import log as logging
 from nova.openstack.common import loopingcall
-from nova.openstack.common import processutils
 from nova.virt.libvirt import designer
+
+try:
+    from nova.openstack.common import log as logging
+    from nova.openstack.common import processutils
+except ImportError:
+    # Support for Kilo. changes in import modules
+    from oslo_log import log as logging
+    from oslo_concurrency import processutils
+
 # Support for JUNO - Phase 1
 # JUNO release doesn't support libvirt_vif_driver configuration in nova.conf
 # vif_driver is set to LibvirtGenericVIFDriver. plug/unplug/get_config api from
@@ -64,12 +71,17 @@ compute_mgr = None
 # MonkeyPatch the vif_driver with VRouterVIFDriver during restart of nova-compute
 def patched_get_nw_info_for_instance(instance):
     if not isinstance(compute_mgr.driver.vif_driver, VRouterVIFDriver):
-        compute_mgr.driver.vif_driver = \
-            VRouterVIFDriver(compute_mgr.driver._get_connection)
+        try:
+            compute_mgr.driver.vif_driver = \
+                VRouterVIFDriver(compute_mgr.driver._get_connection)
+        except TypeError:
+            # OpenStack Kilo handles connection in different way
+            compute_mgr.driver.vif_driver = \
+                VRouterVIFDriver()
     return orig_get_nw_info_for_instance(instance)
 
 class ContrailNetworkAPI(API):
-    def __init__(self):
+    def __init__(self, skip_policy_check=False):
         # MonkeyPatch the compute_utils.get_nw_info_for_instance with 
         # patched_get_nw_info_for_instance to enable overwriting vif_driver
         if orig_get_nw_info_for_instance is None:
@@ -84,22 +96,33 @@ class ContrailNetworkAPI(API):
             compute_mgr = inspect.stack()[5][0].f_locals['self']
         if not isinstance(compute_mgr, ComputeManager):
             raise BadRequest("Can't get hold of compute manager");
-        super(ContrailNetworkAPI, self).__init__()
+        try:
+            super(ContrailNetworkAPI, self).__init__(skip_policy_check)
+        except TypeError:
+            super(ContrailNetworkAPI, self).__init__()
     #end __init__
 
     def allocate_for_instance(self, *args, **kwargs):
         # Monkey patch the vif_driver if not already set
         if not isinstance(compute_mgr.driver.vif_driver, VRouterVIFDriver):
-            compute_mgr.driver.vif_driver = \
-                VRouterVIFDriver(compute_mgr.driver._get_connection)
+            try:
+                compute_mgr.driver.vif_driver = \
+                    VRouterVIFDriver(compute_mgr.driver._get_connection)
+            except TypeError:
+                compute_mgr.driver.vif_driver = \
+                    VRouterVIFDriver()
         return super(ContrailNetworkAPI, self).allocate_for_instance(*args, **kwargs)
     #end
 
     def deallocate_for_instance(self, *args, **kwargs):
         # Monkey patch the vif_driver if not already set
         if not isinstance(compute_mgr.driver.vif_driver, VRouterVIFDriver):
-            compute_mgr.driver.vif_driver = \
-                VRouterVIFDriver(compute_mgr.driver._get_connection)
+            try:
+                compute_mgr.driver.vif_driver = \
+                    VRouterVIFDriver(compute_mgr.driver._get_connection)
+            except TypeError:
+                compute_mgr.driver.vif_driver = \
+                    VRouterVIFDriver()
         return super(ContrailNetworkAPI, self).deallocate_for_instance(*args, **kwargs)
     #end
 #end ContrailNetworkAPI
@@ -109,8 +132,11 @@ class VRouterVIFDriver(LibVirtVIFDriver):
     
     PORT_TYPE = 'NovaVMPort'
 
-    def __init__(self, get_connection):
-        super(VRouterVIFDriver, self).__init__(get_connection)
+    def __init__(self, get_connection=None):
+        if get_connection:
+   	    super(VRouterVIFDriver, self).__init__(get_connection)
+        else:
+            super(VRouterVIFDriver, self).__init__()
         self._vrouter_semaphore = eventlet.semaphore.Semaphore()
         self._vrouter_client = ContrailVRouterApi(doconnect=True, semaphore=self._vrouter_semaphore)
         timer = loopingcall.FixedIntervalLoopingCall(self._keep_alive)
