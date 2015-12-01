@@ -16,7 +16,7 @@ override_dh_auto_clean:
 
 override_dh_auto_build:
 	
-override_dh_auto_isntall:
+override_dh_auto_install:
 
 override_dh_install:
 	for i in $$(ls | grep -v debian);do echo "$$i /usr/src/nova-contrail-vif/" >> debian/nova-contrail-vif.install;done
