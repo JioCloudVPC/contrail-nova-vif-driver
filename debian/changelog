@@ -1,4 +1,4 @@
-nova-contrail-vif (2.1) trusty; urgency=low
+nova-contrail-vif (2.11) trusty; urgency=low
 
   [ Pramod Venkatesh ]
   * Testing nova-contrail-vif Packaging
