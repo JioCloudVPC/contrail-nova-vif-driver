@@ -168,7 +168,7 @@ class VRouterVIFDriver(LibVirtVIFDriver):
     def get_config(self, instance, vif, image_meta, inst_type, virt_type=None):
         try:
             conf = super(VRouterVIFDriver, self).get_config(instance, vif, 
-                                                        image_meta, inst_type)
+                                              image_meta, inst_type,virt_type)
         except TypeError:
             conf = super(VRouterVIFDriver, self).get_base_config(instance, vif, 
                                              image_meta, inst_type, virt_type)
